@@ -46,12 +46,12 @@ export default async function LoginPage({
             {resolvedSearchParams?.error && (
               <p className="text-sm text-red-500">{resolvedSearchParams.error}</p>
             )}
+            <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white mt-4">
+              Sign in
+            </Button>
           </form>
         </CardContent>
         <CardFooter className="flex flex-col gap-4">
-          <Button form="login-form" className="w-full bg-blue-600 hover:bg-blue-700 text-white">
-            Sign In
-          </Button>
           <div className="text-sm text-zinc-400 text-center">
             Don&apos;t have an account?{' '}
             <Link href="/auth/register" className="text-blue-500 hover:underline">

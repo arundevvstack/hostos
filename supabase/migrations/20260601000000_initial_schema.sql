@@ -3,7 +3,7 @@ create extension if not exists "vector" with schema extensions;
 create extension if not exists "uuid-ossp" with schema extensions;
 
 -- Table: public.users
-create table public.users (
+create table if not exists public.users (
   id uuid references auth.users(id) on delete cascade primary key,
   email text not null,
   full_name text,
@@ -13,7 +13,7 @@ create table public.users (
 );
 
 -- Table: public.hosts
-create table public.hosts (
+create table if not exists public.hosts (
   id uuid default uuid_generate_v4() primary key,
   user_id uuid references public.users(id) on delete cascade not null,
   name text not null,
@@ -29,7 +29,7 @@ create table public.hosts (
 );
 
 -- Table: public.knowledge_documents
-create table public.knowledge_documents (
+create table if not exists public.knowledge_documents (
   id uuid default uuid_generate_v4() primary key,
   user_id uuid references public.users(id) on delete cascade not null,
   file_name text not null,
@@ -45,7 +45,7 @@ create table public.knowledge_documents (
 );
 
 -- Table: public.host_knowledge_links
-create table public.host_knowledge_links (
+create table if not exists public.host_knowledge_links (
   host_id uuid references public.hosts(id) on delete cascade,
   document_id uuid references public.knowledge_documents(id) on delete cascade,
   created_at timestamp with time zone default timezone('utc'::text, now()) not null,
@@ -53,7 +53,7 @@ create table public.host_knowledge_links (
 );
 
 -- Table: public.guests
-create table public.guests (
+create table if not exists public.guests (
   id uuid default uuid_generate_v4() primary key,
   user_id uuid references public.users(id) on delete cascade not null,
   name text not null,
@@ -66,7 +66,7 @@ create table public.guests (
 );
 
 -- Table: public.episodes
-create table public.episodes (
+create table if not exists public.episodes (
   id uuid default uuid_generate_v4() primary key,
   user_id uuid references public.users(id) on delete cascade not null,
   title text not null,
@@ -79,7 +79,7 @@ create table public.episodes (
 );
 
 -- Table: public.conversations
-create table public.conversations (
+create table if not exists public.conversations (
   id uuid default uuid_generate_v4() primary key,
   episode_id uuid references public.episodes(id) on delete cascade not null,
   user_id uuid references public.users(id) on delete cascade not null,
@@ -89,7 +89,7 @@ create table public.conversations (
 );
 
 -- Table: public.summaries
-create table public.summaries (
+create table if not exists public.summaries (
   id uuid default uuid_generate_v4() primary key,
   episode_id uuid references public.episodes(id) on delete cascade unique not null,
   user_id uuid references public.users(id) on delete cascade not null,

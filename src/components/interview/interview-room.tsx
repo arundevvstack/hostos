@@ -166,13 +166,13 @@ export default function InterviewRoom({
           <div className="p-4 border-t border-zinc-800 bg-zinc-900/50">
             <form onSubmit={handleSubmit} className="flex gap-2">
               <Input 
-                value={input}
+                value={input || ''}
                 onChange={handleInputChange}
                 placeholder={`Type as ${episode.guests?.name}...`}
                 className="bg-zinc-950 border-zinc-800"
                 disabled={isLoading}
               />
-              <Button type="submit" disabled={isLoading || !input.trim()} className="bg-blue-600 hover:bg-blue-700">
+              <Button type="submit" disabled={isLoading || !input?.trim()} className="bg-blue-600 hover:bg-blue-700">
                 <Send className="h-4 w-4" />
               </Button>
             </form>

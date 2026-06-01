@@ -57,12 +57,12 @@ export default async function RegisterPage({
             {resolvedSearchParams?.error && (
               <p className="text-sm text-red-500">{resolvedSearchParams.error}</p>
             )}
+            <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white mt-4">
+              Create account
+            </Button>
           </form>
         </CardContent>
         <CardFooter className="flex flex-col gap-4">
-          <Button form="register-form" className="w-full bg-blue-600 hover:bg-blue-700 text-white">
-            Create account
-          </Button>
           <div className="text-sm text-zinc-400 text-center">
             Already have an account?{' '}
             <Link href="/auth/login" className="text-blue-500 hover:underline">
