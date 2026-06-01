@@ -1,3 +1,4 @@
+import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
 import { generateGuestResponse } from '@/lib/ai/guest-simulator'
@@ -7,7 +8,8 @@ import { generateGuestResponse } from '@/lib/ai/guest-simulator'
 
 export async function POST(req: Request) {
   const { episodeId } = await req.json()
-  const supabase = createClient()
+  const cookieStore = await cookies()
+  const supabase = createClient(cookieStore)
   
   // Generate Guest Response
   const guestResponse = await generateGuestResponse(episodeId)

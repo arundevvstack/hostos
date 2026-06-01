@@ -11,9 +11,12 @@ import { ArrowLeft, Target, RefreshCcw, Cpu, CheckCircle2 } from 'lucide-react'
 import { submitHumanScore } from './actions'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
+import { cookies } from 'next/headers'
+
 export default async function InterviewReplayPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
-  const supabase = createClient()
+  const cookieStore = await cookies()
+  const supabase = createClient(cookieStore)
   
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/auth/login')

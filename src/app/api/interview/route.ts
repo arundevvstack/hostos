@@ -1,13 +1,16 @@
 import { google } from '@ai-sdk/google'
-import { generateObject, streamText, Message } from 'ai'
+import { generateObject, streamText } from 'ai'
 import { z } from 'zod'
 import { createClient } from '@/utils/supabase/server'
 
 export const maxDuration = 60
 
+import { cookies } from 'next/headers'
+
 export async function POST(req: Request) {
-  const { messages, episodeId, hostId, currentPhase } = await req.json()
-  const supabase = createClient()
+  const { messages, episodeId, hostId, currentPhase } = await req.json() as { messages: any[], hostId: string, episodeId: string, currentPhase: string }
+  const cookieStore = await cookies()
+  const supabase = createClient(cookieStore)
   
   const lastUserMessage = messages[messages.length - 1]
   const { data: userMsgData } = await supabase.from('conversations').insert({
@@ -19,7 +22,7 @@ export async function POST(req: Request) {
   const guestMessageId = userMsgData?.id
 
   const { data: episode } = await supabase.from('episodes').select('*, hosts(*), guests(*)').eq('id', episodeId).single()
-  const { data: hostDna } = await supabase.from('host_dna').eq('host_id', hostId).single()
+  const { data: hostDna } = await supabase.from('host_dna').select('*').eq('host_id', hostId).single()
   const { data: phases } = await supabase.from('interview_phases').select('*')
   const activePhaseInfo = phases?.find(p => p.name === currentPhase)
 
@@ -49,7 +52,7 @@ export async function POST(req: Request) {
     phase_reasoning: z.string(),
   })
 
-  const conversationHistory = messages.map((m: Message) => `${m.role}: ${m.content}`).join('\n')
+  const conversationHistory = messages.map((m: any) => `${m.role}: ${m.content}`).join('\n')
 
   const { object: evaluation } = await generateObject({
     model: google('gemini-1.5-pro'),
@@ -145,5 +148,5 @@ INSTRUCTIONS:
     }
   })
 
-  return result.toDataStreamResponse()
+  return result.toTextStreamResponse()
 }

@@ -1,3 +1,4 @@
+import { cookies } from 'next/headers'
 import { createClient } from '@/utils/supabase/server'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
@@ -6,7 +7,8 @@ import { Mic, Plus } from 'lucide-react'
 import { deleteHost } from './actions'
 
 export default async function HostsPage() {
-  const supabase = createClient()
+  const cookieStore = await cookies()
+  const supabase = createClient(cookieStore)
   const { data: { user } } = await supabase.auth.getUser()
 
   const { data: hosts } = await supabase

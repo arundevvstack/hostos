@@ -34,7 +34,7 @@ export default function InterviewRoom({
 
   // Vercel AI SDK hook.
   // We will call an API route we haven't built yet: /api/interview
-  const { messages, input, handleInputChange, handleSubmit, isLoading } = useChat({
+  const { messages, input, handleInputChange, handleSubmit, isLoading } = (useChat as any)({
     api: '/api/interview',
     body: {
       episodeId: episode.id,
@@ -143,7 +143,7 @@ export default function InterviewRoom({
                 Conversation hasn't started yet. Type a message as the guest.
               </div>
             )}
-            {messages.map((msg) => (
+            {messages.map((msg: any) => (
               <div 
                 key={msg.id} 
                 className={`flex flex-col max-w-[80%] ${msg.role === 'user' ? 'ml-auto items-end' : 'mr-auto items-start'}`}

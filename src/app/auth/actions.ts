@@ -1,11 +1,13 @@
 'use server'
+import { cookies } from 'next/headers'
 
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/utils/supabase/server'
 
 export async function login(formData: FormData) {
-  const supabase = createClient()
+  const cookieStore = await cookies()
+  const supabase = createClient(cookieStore)
 
   const email = formData.get('email') as string
   const password = formData.get('password') as string
@@ -24,7 +26,8 @@ export async function login(formData: FormData) {
 }
 
 export async function signup(formData: FormData) {
-  const supabase = createClient()
+  const cookieStore = await cookies()
+  const supabase = createClient(cookieStore)
 
   const email = formData.get('email') as string
   const password = formData.get('password') as string
@@ -49,7 +52,8 @@ export async function signup(formData: FormData) {
 }
 
 export async function logout() {
-  const supabase = createClient()
+  const cookieStore = await cookies()
+  const supabase = createClient(cookieStore)
   await supabase.auth.signOut()
   redirect('/auth/login')
 }

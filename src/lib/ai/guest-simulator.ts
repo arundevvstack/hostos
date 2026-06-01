@@ -1,9 +1,11 @@
+import { cookies } from 'next/headers'
 import { google } from '@ai-sdk/google'
-import { generateText, Message } from 'ai'
+import { generateText } from 'ai'
 import { createClient } from '@/utils/supabase/server'
 
 export async function generateGuestResponse(episodeId: string) {
-  const supabase = createClient()
+  const cookieStore = await cookies()
+  const supabase = createClient(cookieStore)
 
   // Fetch episode and synthetic configuration
   const { data: episode } = await supabase.from('episodes').select('*, synthetic_episodes(*, synthetic_personas(*), synthetic_scenarios(*))').eq('id', episodeId).single()
@@ -16,7 +18,7 @@ export async function generateGuestResponse(episodeId: string) {
   // Fetch history
   const { data: history } = await supabase.from('conversations').select('*').eq('episode_id', episodeId).order('created_at', { ascending: true })
 
-  const messages: Message[] = history?.map((msg: any) => ({
+  const messages: any[] = history?.map((msg: any) => ({
     id: msg.id,
     role: msg.role === 'host' ? 'user' : 'assistant', // To the guest, the host is the user
     content: msg.message

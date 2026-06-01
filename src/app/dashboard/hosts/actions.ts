@@ -1,11 +1,13 @@
 'use server'
+import { cookies } from 'next/headers'
 
 import { createClient } from '@/utils/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 
 export async function createHost(formData: FormData) {
-  const supabase = createClient()
+  const cookieStore = await cookies()
+  const supabase = createClient(cookieStore)
   
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
@@ -42,7 +44,8 @@ export async function createHost(formData: FormData) {
 }
 
 export async function deleteHost(id: string) {
-  const supabase = createClient()
+  const cookieStore = await cookies()
+  const supabase = createClient(cookieStore)
   
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {

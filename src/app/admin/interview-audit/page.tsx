@@ -6,8 +6,11 @@ import { Progress } from '@/components/ui/progress'
 import { AlertCircle, Target, MemoryStick, Activity, BarChart2 } from 'lucide-react'
 import { redirect } from 'next/navigation'
 
+import { cookies } from 'next/headers'
+
 export default async function InterviewAuditDashboard() {
-  const supabase = createClient()
+  const cookieStore = await cookies()
+  const supabase = createClient(cookieStore)
   
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {

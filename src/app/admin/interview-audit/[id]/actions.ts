@@ -3,8 +3,11 @@
 import { createClient } from '@/utils/supabase/server'
 import { revalidatePath } from 'next/cache'
 
+import { cookies } from 'next/headers'
+
 export async function submitHumanScore(formData: FormData) {
-  const supabase = createClient()
+  const cookieStore = await cookies()
+  const supabase = createClient(cookieStore)
   
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {

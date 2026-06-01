@@ -1,3 +1,4 @@
+import { cookies } from 'next/headers'
 import { createClient } from '@/utils/supabase/server'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
@@ -6,7 +7,8 @@ import { Users, Plus, Globe, Building2 } from 'lucide-react'
 import { deleteGuest } from './actions'
 
 export default async function GuestsPage() {
-  const supabase = createClient()
+  const cookieStore = await cookies()
+  const supabase = createClient(cookieStore)
   const { data: { user } } = await supabase.auth.getUser()
 
   const { data: guests } = await supabase
