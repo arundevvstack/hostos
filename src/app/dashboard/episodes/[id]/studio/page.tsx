@@ -49,11 +49,11 @@ export default function StudioPage() {
     setTranscript(convData || [])
 
     // Assets
-    const { data: sumData } = await supabase.from('summaries').select('*').eq('episode_id', episodeId).single()
+    const { data: sumData } = await supabase.from('summaries').select('*').eq('episode_id', episodeId).maybeSingle()
     const { data: chapData } = await supabase.from('episode_chapters').select('*').eq('episode_id', episodeId).order('start_time_seconds', { ascending: true })
     const { data: quoteData } = await supabase.from('episode_quotes').select('*').eq('episode_id', episodeId)
     const { data: socialData } = await supabase.from('episode_social_drafts').select('*').eq('episode_id', episodeId)
-    const { data: renderData } = await supabase.from('podcast_renders').select('*').eq('episode_id', episodeId).order('created_at', { ascending: false }).limit(1).single()
+    const { data: renderData } = await supabase.from('podcast_renders').select('*').eq('episode_id', episodeId).order('created_at', { ascending: false }).limit(1).maybeSingle()
 
     setSummary(sumData)
     setChapters(chapData || [])

@@ -107,7 +107,13 @@ export default async function EpisodesPage() {
                         Enter Room
                       </Button>
                     </Link>
-                  ) : null}
+                  ) : (
+                    <Link href={`/dashboard/episodes/${episode.id}/studio`}>
+                      <Button variant="outline" size="sm" className="border-indigo-200 text-indigo-700 bg-indigo-50 hover:bg-indigo-100 rounded-[10px] shadow-sm font-semibold px-4">
+                        Studio
+                      </Button>
+                    </Link>
+                  )}
                   <form action={async () => {
                     'use server'
                     await deleteEpisode(episode.id)

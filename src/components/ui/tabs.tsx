@@ -100,6 +100,8 @@ export function TabsContent({
         className
       )}
       {...props}
-    />
+    >
+      {children}
+    </div>
   )
 }
