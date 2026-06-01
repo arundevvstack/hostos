@@ -1,14 +1,20 @@
-import { createServerClient } from '@supabase/ssr'
-import { NextResponse, type NextRequest } from 'next/server'
+import { createServerClient } from "@supabase/ssr";
+import { type NextRequest, NextResponse } from "next/server";
 
-export async function updateSession(request: NextRequest) {
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+
+export const createClient = (request: NextRequest) => {
+  // Create an unmodified response
   let supabaseResponse = NextResponse.next({
-    request,
-  })
+    request: {
+      headers: request.headers,
+    },
+  });
 
   const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    supabaseUrl!,
+    supabaseKey!,
     {
       cookies: {
         getAll() {
@@ -24,20 +30,8 @@ export async function updateSession(request: NextRequest) {
           )
         },
       },
-    }
-  )
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  const isPublicRoute = request.nextUrl.pathname === '/' || request.nextUrl.pathname.startsWith('/auth')
-
-  if (!user && !isPublicRoute) {
-    const url = request.nextUrl.clone()
-    url.pathname = '/auth/login'
-    return NextResponse.redirect(url)
-  }
+    },
+  );
 
   return supabaseResponse
-}
+};

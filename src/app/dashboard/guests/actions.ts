@@ -1,0 +1,55 @@
+'use server'
+
+import { createClient } from '@/utils/supabase/server'
+import { revalidatePath } from 'next/cache'
+import { redirect } from 'next/navigation'
+
+export async function createGuest(formData: FormData) {
+  const supabase = createClient()
+  
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) {
+    redirect('/auth/login')
+  }
+
+  const name = formData.get('name') as string
+  const bio = formData.get('bio') as string
+  const company = formData.get('company') as string
+  const website = formData.get('website') as string
+  const notes = formData.get('notes') as string
+
+  const { error } = await supabase.from('guests').insert({
+    user_id: user.id,
+    name,
+    bio,
+    company,
+    website,
+    notes,
+  })
+
+  if (error) {
+    console.error('Error creating guest:', error)
+    throw new Error('Failed to create guest')
+  }
+
+  revalidatePath('/dashboard/guests')
+  redirect('/dashboard/guests')
+}
+
+export async function deleteGuest(id: string) {
+  const supabase = createClient()
+  
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) {
+    redirect('/auth/login')
+  }
+
+  const { error } = await supabase.from('guests').delete().match({ id, user_id: user.id })
+
+  if (error) {
+    console.error('Error deleting guest:', error)
+    throw new Error('Failed to delete guest')
+  }
+
+  revalidatePath('/dashboard/guests')
+}
