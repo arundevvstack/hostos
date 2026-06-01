@@ -96,8 +96,8 @@ async function runBenchmarks() {
         // Guest
         const guestPrompt = `You are ${persona.name} (${persona.category}). Bio: ${persona.biography}. Constraint: ${scenario.behavior_prompt}.`
         const guestResult = await generateText({ model: google('gemini-1.5-pro'), prompt: guestPrompt })
-        totalInputTokens += guestResult.usage.promptTokens
-        totalOutputTokens += guestResult.usage.completionTokens
+        totalInputTokens += (guestResult.usage as any).promptTokens || 0
+        totalOutputTokens += (guestResult.usage as any).completionTokens || 0
         conversation.push({ role: 'guest', content: guestResult.text })
 
         // Eval (Call 1)
@@ -106,14 +106,14 @@ async function runBenchmarks() {
           schema: z.object({ strategy: z.enum(['FOLLOW_UP', 'CHALLENGE', 'CLARIFY', 'STORY_EXTRACTION', 'EMOTIONAL_PROBE', 'TOPIC_SHIFT', 'SUMMARY']), curiosity_score: z.number().min(0).max(100), memory_extracted: z.string().optional() }),
           prompt: `Evaluate Guest: ${guestResult.text}. History: ${JSON.stringify(conversation)}`
         })
-        totalInputTokens += evalResult.usage.promptTokens
-        totalOutputTokens += evalResult.usage.completionTokens
+        totalInputTokens += (evalResult.usage as any).promptTokens || 0
+        totalOutputTokens += (evalResult.usage as any).completionTokens || 0
 
         // Host (Call 2)
         const hostPrompt = `You are ${host.name}. Strategy: ${evalResult.object.strategy}. Memory: ${evalResult.object.memory_extracted}. Guest said: ${guestResult.text}.`
         const hostResult = await generateText({ model: google('gemini-1.5-pro'), prompt: hostPrompt })
-        totalInputTokens += hostResult.usage.promptTokens
-        totalOutputTokens += hostResult.usage.completionTokens
+        totalInputTokens += (hostResult.usage as any).promptTokens || 0
+        totalOutputTokens += (hostResult.usage as any).completionTokens || 0
         conversation.push({ role: 'host', content: hostResult.text })
 
         if (turn > 1 && conversation[conversation.length - 1].content === conversation[conversation.length - 3].content) {
