@@ -1,7 +1,7 @@
 import { cookies } from 'next/headers'
 import { createClient } from '@/utils/supabase/server'
 import { redirect } from 'next/navigation'
-import InterviewRoom from '@/components/interview/interview-room'
+import InterviewRoomV2Wrapper from '@/components/interview/interview-room-v2'
 
 export default async function InterviewPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -71,14 +71,7 @@ export default async function InterviewPage({ params }: { params: Promise<{ id: 
 
   return (
     <div className="h-[calc(100vh-theme(spacing.16))] w-full flex overflow-hidden">
-      <InterviewRoom 
-        episode={episode} 
-        hostDna={hostDna}
-        initialMemories={memories || []}
-        initialHistory={conversations || []}
-        initialContradictions={contradictions || []}
-        initialCuriosityTargets={curiosityTargets || []}
-      />
+      <InterviewRoomV2Wrapper episode={episode} />
     </div>
   )
 }

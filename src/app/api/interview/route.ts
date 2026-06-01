@@ -1,152 +1,118 @@
-import { google } from '@ai-sdk/google'
-import { generateObject, streamText } from 'ai'
-import { z } from 'zod'
+import { createGroq } from '@ai-sdk/groq'
+import { streamText } from 'ai'
 import { createClient } from '@/utils/supabase/server'
+import { cookies } from 'next/headers'
 
 export const maxDuration = 60
 
-import { cookies } from 'next/headers'
+const groq = createGroq({ apiKey: process.env.GROQ_API_KEY })
 
 export async function POST(req: Request) {
-  const { messages, episodeId, hostId, currentPhase } = await req.json() as { messages: any[], hostId: string, episodeId: string, currentPhase: string }
-  const cookieStore = await cookies()
-  const supabase = createClient(cookieStore)
-  
-  const lastUserMessage = messages[messages.length - 1]
-  const { data: userMsgData } = await supabase.from('conversations').insert({
-    episode_id: episodeId,
-    role: 'guest',
-    message: lastUserMessage.content,
-  }).select('id').single()
+  try {
+    // Read EVERYTHING from the client request so we don't have to query the DB before responding
+    const { messages, episodeId, hostId, currentPhase, episode, hostDna, memories } = await req.json()
 
-  const guestMessageId = userMsgData?.id
+    const cookieStore = await cookies()
+    const supabase = createClient(cookieStore)
 
-  const { data: episode } = await supabase.from('episodes').select('*, hosts(*), guests(*)').eq('id', episodeId).single()
-  const { data: hostDna } = await supabase.from('host_dna').select('*').eq('host_id', hostId).single()
-  const { data: phases } = await supabase.from('interview_phases').select('*')
-  const activePhaseInfo = phases?.find(p => p.name === currentPhase)
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return new Response('Unauthorized', { status: 401 })
 
-  // ==========================================
-  // CALL 1: STRUCTURED EVALUATION LAYER
-  // ==========================================
-  const evaluationSchema = z.object({
-    sentiment: z.enum(['positive', 'neutral', 'negative', 'mixed']),
-    confidence: z.number().min(0).max(100),
-    emotional_intensity: z.number().min(0).max(100),
-    curiosity_score: z.number().min(0).max(100),
-    memories: z.array(z.object({
-      type: z.enum(['fact', 'story', 'achievement', 'failure', 'emotional_moment', 'business_metric', 'lesson', 'personal_experience']),
-      content: z.string()
-    })),
-    contradictions: z.array(z.object({
-      contradiction_a: z.string(),
-      contradiction_b: z.string(),
-      severity: z.enum(['low', 'medium', 'high'])
-    })),
-    curiosity_targets: z.array(z.object({
-      trigger_statement: z.string(),
-      suggested_followups: z.array(z.string())
-    })),
-    response_strategy: z.enum(['FOLLOW_UP', 'CHALLENGE', 'CLARIFY', 'STORY_EXTRACTION', 'EMOTIONAL_PROBE', 'TOPIC_SHIFT', 'SUMMARY', 'REFLECTION']),
-    next_phase: z.string(),
-    phase_reasoning: z.string(),
-  })
+    const lastUserMessage = messages[messages.length - 1]
 
-  const conversationHistory = messages.map((m: any) => `${m.role}: ${m.content}`).join('\n')
+    const hostName = episode?.hosts?.name || 'the host'
+    const guestName = episode?.guests?.name || 'the guest'
 
-  const { object: evaluation } = await generateObject({
-    model: google('gemini-1.5-pro'),
-    schema: evaluationSchema,
-    system: `You are the AI Evaluation Layer for a podcast interview. 
-Current Phase: ${currentPhase} (Goal: ${activePhaseInfo?.goal})
-Criteria to progress: ${activePhaseInfo?.completion_criteria}`,
-    prompt: `Guest just said: "${lastUserMessage.content}"\n\nFull History:\n${conversationHistory}`,
-  })
+    const systemPrompt = `You are ${hostName}, a charismatic professional podcast host. You are interviewing ${guestName}.
 
-  if (guestMessageId) {
-    await supabase.from('conversation_metrics').insert({
-      message_id: guestMessageId,
-      sentiment: evaluation.sentiment,
-      confidence: evaluation.confidence,
-      emotional_intensity: evaluation.emotional_intensity,
-      curiosity_score: evaluation.curiosity_score,
-      topic_category: 'general',
-      importance_score: 50
+YOUR PERSONALITY: ${episode?.hosts?.personality_traits?.join(', ') || 'curious, warm, insightful'}
+YOUR STYLE: ${episode?.hosts?.interview_style || 'conversational'}, ${episode?.hosts?.tone_of_voice || 'warm and engaging'}
+YOUR EXPERTISE: ${episode?.hosts?.expertise_areas?.join(', ') || 'business, technology, culture'}
+
+GUEST BIO: ${episode?.guests?.bio || 'No bio available'}
+GUEST COMPANY: ${episode?.guests?.company || 'N/A'}
+
+CURRENT PHASE: ${currentPhase || 'INTRODUCTION'}
+${currentPhase === 'INTRODUCTION' ? '→ Welcome them warmly. Ask what brings them here today.' : ''}
+${currentPhase === 'DISCOVERY' ? '→ Ask about their journey, background, and what drives them.' : ''}
+${currentPhase === 'DEEP_DIVE' ? '→ Go deeper. Ask for specific stories, numbers, turning points.' : ''}
+${currentPhase === 'CHALLENGE' ? '→ Respectfully push back. Ask tough, thought-provoking questions.' : ''}
+${currentPhase === 'REFLECTION' ? '→ Help them synthesize. What did they learn? What wisdom can they share?' : ''}
+${currentPhase === 'CLOSING' ? '→ Wrap up warmly. Ask for final advice to the audience.' : ''}
+
+${memories && memories.length > 0 ? `THINGS YOU ALREADY KNOW FROM THIS CONVERSATION:\n${memories.map((m: any) => `- ${m.memory_content}`).join('\n')}` : ''}
+
+RULES:
+- You ARE ${hostName}. Never break character. Never say "As an AI".
+- Be genuinely curious. React to what they say before asking the next question.
+- Keep responses SHORT: 2-3 sentences max. Ask ONE question at a time.
+- Show personality. Use natural language, not corporate speak.
+- Reference things they said earlier to show you're really listening.`
+
+    // Stream using fast Groq model immediately (NO blocking database calls)
+    const result = await streamText({
+      model: groq('llama-3.1-8b-instant'),
+      system: systemPrompt,
+      messages: messages.map((m: any) => ({
+        role: m.role === 'assistant' ? 'assistant' as const : 'user' as const,
+        content: m.content,
+      })),
+      onFinish: async ({ text }) => {
+        // Save guest message, host message, and extract memory all in the background after streaming finishes
+        const cleanedText = text.trim()
+        
+        const promises = [
+          // Save guest message
+          supabase.from('conversations').insert({
+            episode_id: episodeId,
+            user_id: user.id,
+            role: 'guest',
+            content: lastUserMessage.content,
+          })
+        ]
+
+        if (cleanedText) {
+          // Save host response
+          promises.push(
+            supabase.from('conversations').insert({
+              episode_id: episodeId,
+              user_id: user.id,
+              role: 'host',
+              content: cleanedText,
+            })
+          )
+        }
+
+        // Save a memory of what the guest said
+        if (lastUserMessage.content.length > 15) {
+          promises.push(
+            supabase.from('conversation_memory').insert({
+              episode_id: episodeId,
+              memory_type: 'fact',
+              memory_content: lastUserMessage.content.slice(0, 300),
+              confidence_score: 80,
+            })
+          )
+        }
+
+        Promise.all(promises).catch(err => {
+          console.error('Failed to save to Supabase in onFinish:', err)
+        })
+      },
     })
-  }
 
-  for (const memory of evaluation.memories) {
-    await supabase.from('conversation_memory').insert({
-      episode_id: episodeId,
-      memory_type: memory.type,
-      memory_content: memory.content,
-      confidence_score: 90
+    return new Response(result.textStream, {
+      headers: {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
+      },
     })
+  } catch (error: any) {
+    console.error('Interview API Error:', error?.message || error)
+    return new Response(
+      JSON.stringify({ error: error?.message || 'Internal server error' }),
+      { status: 500, headers: { 'Content-Type': 'application/json' } }
+    )
   }
-
-  // Update phase if changed
-  let activePhase = currentPhase
-  if (evaluation.next_phase && evaluation.next_phase !== currentPhase) {
-    activePhase = evaluation.next_phase
-    await supabase.from('episodes').update({ current_phase: activePhase }).eq('id', episodeId)
-  }
-
-  // ==========================================
-  // CALL 2: STREAMING GENERATION
-  // ==========================================
-  const { data: latestMemories } = await supabase.from('conversation_memory').select('*').eq('episode_id', episodeId).limit(15)
-
-  const systemPrompt = `You are ${episode?.hosts?.name}, a professional podcast host.
-Your Personality: ${episode?.hosts?.personality_traits?.join(', ')}
-Your Expertise: ${episode?.hosts?.expertise_areas?.join(', ')}
-Your Tone: ${episode?.hosts?.tone_of_voice}
-
-Host DNA Sliders (0-100):
-- Curiosity: ${hostDna?.curiosity_level || 50}
-- Challenge: ${hostDna?.challenge_level || 50}
-- Empathy: ${hostDna?.empathy_level || 50}
-- Storytelling: ${hostDna?.storytelling_level || 50}
-
-Current Interview Phase: ${activePhase}
-Selected Strategy: ${evaluation.response_strategy}
-
-Guest Context: ${episode?.guests?.name}, ${episode?.guests?.bio}
-
-Dynamic Memory Feed (Facts previously extracted):
-${latestMemories?.map(m => `[ID: ${m.id}] - ${m.memory_content}`).join('\n')}
-
-INSTRUCTIONS:
-1. Generate the next response. Execute strategy: ${evaluation.response_strategy}.
-2. If you reference a fact from the Dynamic Memory Feed, you MUST append a memory tag at the VERY END of your response formatted exactly like this: <REFS: id1, id2>. E.g., "That is interesting. <REFS: a1b2c3d4-..., f5e6d7c8-...>". 
-3. Do not act like an AI. Keep responses conversational and human-like.`
-
-  const result = await streamText({
-    model: google('gemini-1.5-pro'),
-    system: systemPrompt,
-    messages,
-    onFinish: async ({ text }) => {
-      // Extract memory references via regex
-      const refRegex = /<REFS:\s*([^>]+)>/;
-      const match = text.match(refRegex);
-      
-      let referencedIds: string[] = [];
-      let cleanedText = text;
-
-      if (match) {
-        referencedIds = match[1].split(',').map(id => id.trim());
-        cleanedText = text.replace(refRegex, '').trim();
-      }
-
-      await supabase.from('conversations').insert({
-        episode_id: episodeId,
-        role: 'host',
-        message: cleanedText,
-        referenced_memory_ids: referencedIds,
-        response_strategy: evaluation.response_strategy,
-        interview_phase: activePhase
-      })
-    }
-  })
-
-  return result.toTextStreamResponse()
 }

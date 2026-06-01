@@ -23,6 +23,12 @@ export async function createHost(formData: FormData) {
   const expertiseAreas = (formData.get('expertise_areas') as string)?.split(',').map(s => s.trim()).filter(Boolean) || []
   const personalityTraits = (formData.get('personality_traits') as string)?.split(',').map(s => s.trim()).filter(Boolean) || []
 
+  const voiceProvider = formData.get('voice_provider') as string || 'browser'
+  const voiceId = formData.get('voice_id') as string || null
+  const voiceRate = parseFloat(formData.get('voice_rate') as string) || 1.0
+  const voicePitch = parseFloat(formData.get('voice_pitch') as string) || 1.0
+  const voiceVolume = parseFloat(formData.get('voice_volume') as string) || 1.0
+
   const { data, error } = await supabase.from('hosts').insert({
     user_id: user.id,
     name,
@@ -32,6 +38,11 @@ export async function createHost(formData: FormData) {
     system_prompt: systemPrompt,
     expertise_areas: expertiseAreas,
     personality_traits: personalityTraits,
+    voice_provider: voiceProvider,
+    voice_id: voiceId === 'default' ? null : voiceId,
+    voice_rate: voiceRate,
+    voice_pitch: voicePitch,
+    voice_volume: voiceVolume,
   }).select().single()
 
   if (error) {
@@ -60,4 +71,53 @@ export async function deleteHost(id: string) {
   }
 
   revalidatePath('/dashboard/hosts')
+}
+
+export async function updateHost(formData: FormData) {
+  const cookieStore = await cookies()
+  const supabase = createClient(cookieStore)
+  
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) {
+    redirect('/auth/login')
+  }
+
+  const id = formData.get('id') as string
+  const name = formData.get('name') as string
+  const description = formData.get('description') as string
+  const interviewStyle = formData.get('interview_style') as string
+  const toneOfVoice = formData.get('tone_of_voice') as string
+  const systemPrompt = formData.get('system_prompt') as string
+  
+  const expertiseAreas = (formData.get('expertise_areas') as string)?.split(',').map(s => s.trim()).filter(Boolean) || []
+  const personalityTraits = (formData.get('personality_traits') as string)?.split(',').map(s => s.trim()).filter(Boolean) || []
+
+  const voiceProvider = formData.get('voice_provider') as string || 'browser'
+  const voiceId = formData.get('voice_id') as string || null
+  const voiceRate = parseFloat(formData.get('voice_rate') as string) || 1.0
+  const voicePitch = parseFloat(formData.get('voice_pitch') as string) || 1.0
+  const voiceVolume = parseFloat(formData.get('voice_volume') as string) || 1.0
+
+  const { error } = await supabase.from('hosts').update({
+    name,
+    description,
+    interview_style: interviewStyle,
+    tone_of_voice: toneOfVoice,
+    system_prompt: systemPrompt,
+    expertise_areas: expertiseAreas,
+    personality_traits: personalityTraits,
+    voice_provider: voiceProvider,
+    voice_id: voiceId === 'default' ? null : voiceId,
+    voice_rate: voiceRate,
+    voice_pitch: voicePitch,
+    voice_volume: voiceVolume,
+  }).match({ id, user_id: user.id })
+
+  if (error) {
+    console.error('Error updating host:', error)
+    throw new Error('Failed to update host')
+  }
+
+  revalidatePath('/dashboard/hosts')
+  redirect('/dashboard/hosts')
 }

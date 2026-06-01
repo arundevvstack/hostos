@@ -56,3 +56,24 @@ export async function deleteGuest(id: string) {
 
   revalidatePath('/dashboard/guests')
 }
+
+import { runGuestResearchAgent } from '@/lib/research/agent'
+
+export async function runGuestResearch(guestId: string) {
+  const cookieStore = await cookies()
+  const supabase = createClient(cookieStore)
+  
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) {
+    redirect('/auth/login')
+  }
+
+  // Ensure user owns guest
+  const { data: guest } = await supabase.from('guests').select('id').eq('id', guestId).eq('user_id', user.id).single()
+  if (!guest) throw new Error('Unauthorized')
+
+  await runGuestResearchAgent(guestId)
+
+  revalidatePath(`/dashboard/guests/${guestId}`)
+}
+
