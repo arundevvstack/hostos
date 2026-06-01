@@ -5,11 +5,12 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import Link from 'next/link'
 
-export default function RegisterPage({
+export default async function RegisterPage({
   searchParams,
 }: {
-  searchParams: { error?: string }
+  searchParams: Promise<{ error?: string }>
 }) {
+  const resolvedSearchParams = await searchParams;
   return (
     <div className="flex h-screen w-screen items-center justify-center bg-zinc-950">
       <Card className="w-[400px] border-zinc-800 bg-zinc-900 text-zinc-100">
@@ -53,8 +54,8 @@ export default function RegisterPage({
                 className="bg-zinc-800 border-zinc-700 text-white"
               />
             </div>
-            {searchParams?.error && (
-              <p className="text-sm text-red-500">{searchParams.error}</p>
+            {resolvedSearchParams?.error && (
+              <p className="text-sm text-red-500">{resolvedSearchParams.error}</p>
             )}
           </form>
         </CardContent>
