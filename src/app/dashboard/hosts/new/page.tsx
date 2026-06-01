@@ -1,5 +1,6 @@
 import { createHost } from '../actions'
 import { VoiceSettings } from '@/components/hosts/voice-settings'
+import { AvatarSettings } from '@/components/hosts/avatar-settings'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -132,6 +133,14 @@ export default function NewHostPage() {
               <h3 className="text-[20px] font-bold text-foreground font-heading border-b border-border pb-3 mb-6 mt-10">4. Voice Synthesis</h3>
               <div className="bg-card border border-border shadow-sm rounded-[24px] p-7">
                 <VoiceSettings />
+              </div>
+            </div>
+
+            {/* SECTION: Video Avatar */}
+            <div>
+              <h3 className="text-[20px] font-bold text-foreground font-heading border-b border-border pb-3 mb-6 mt-10">5. Video Avatar (Optional)</h3>
+              <div className="bg-card border border-border shadow-sm rounded-[24px] p-7">
+                <AvatarSettings />
               </div>
             </div>
           </div>

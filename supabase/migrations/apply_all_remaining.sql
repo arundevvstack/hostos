@@ -515,3 +515,284 @@ ALTER TABLE public.podcast_renders ENABLE ROW LEVEL SECURITY;
 -- Disable RLS for authenticated users
 DROP POLICY IF EXISTS "Enable all for authenticated users" ON public.podcast_renders;
 CREATE POLICY "Enable all for authenticated users" ON public.podcast_renders FOR ALL USING (auth.role() = 'authenticated');
+
+-- Phase 12: Avatar Podcast Studio Database Schema
+
+-- 1. avatar_profiles
+create table if not exists public.avatar_profiles (
+  id uuid default uuid_generate_v4() primary key,
+  entity_type text not null check (entity_type in ('host', 'guest')),
+  entity_id uuid not null,
+  provider text not null default 'heygen' check (provider in ('heygen', 'tavus', 'synthesia')),
+  provider_avatar_id text,
+  visual_identity jsonb default '{}'::jsonb,
+  gesture_style text default 'neutral',
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null,
+  updated_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
+-- 2. avatar_studios
+create table if not exists public.avatar_studios (
+  id uuid default uuid_generate_v4() primary key,
+  name text not null,
+  description text,
+  background_url text,
+  theme_config jsonb default '{}'::jsonb,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
+-- 3. video_projects
+create table if not exists public.video_projects (
+  id uuid default uuid_generate_v4() primary key,
+  episode_id uuid references public.episodes(id) on delete cascade not null,
+  studio_id uuid references public.avatar_studios(id) on delete set null,
+  camera_layout text default 'dynamic',
+  status text default 'draft' check (status in ('draft', 'rendering', 'completed', 'failed')),
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null,
+  updated_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
+-- 4. video_renders
+create table if not exists public.video_renders (
+  id uuid default uuid_generate_v4() primary key,
+  video_project_id uuid references public.video_projects(id) on delete cascade not null,
+  format text not null check (format in ('landscape', 'portrait', 'square')),
+  url text,
+  duration numeric,
+  status text default 'processing' check (status in ('processing', 'completed', 'failed')),
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
+-- Enable RLS
+alter table public.avatar_profiles enable row level security;
+alter table public.avatar_studios enable row level security;
+alter table public.video_projects enable row level security;
+alter table public.video_renders enable row level security;
+
+-- Create minimal policies (can be refined later)
+DROP POLICY IF EXISTS "Users can view their avatar profiles" ON public.avatar_profiles;
+create policy "Users can view their avatar profiles" on public.avatar_profiles for all using (true);
+
+DROP POLICY IF EXISTS "Public studios are readable" ON public.avatar_studios;
+create policy "Public studios are readable" on public.avatar_studios for select using (true);
+
+DROP POLICY IF EXISTS "Users can view their video projects" ON public.video_projects;
+create policy "Users can view their video projects" on public.video_projects for all using (true);
+
+DROP POLICY IF EXISTS "Users can view their video renders" ON public.video_renders;
+create policy "Users can view their video renders" on public.video_renders for all using (true);
+
+-- Seed Default Studios
+insert into public.avatar_studios (name, description, theme_config) values
+('Modern Business', 'Clean office background with warm lighting', '{"type": "office"}'::jsonb),
+('Diary Of A CEO Style', 'Dark moody background with neon accents', '{"type": "dark_moody"}'::jsonb),
+('Lex Fridman Style', 'Minimalist black background', '{"type": "minimal_black"}'::jsonb),
+('Joe Rogan Style', 'Brick wall with neon signs and warm desk lamp', '{"type": "brick_neon"}'::jsonb),
+('Minimal White SaaS', 'Bright white cyclorama with clean shadows', '{"type": "white_cyc"}'::jsonb)
+on conflict do nothing;
+
+-- Phase 12G: AI Shorts Generator Database Schema
+
+-- 1. clip_candidates
+create table if not exists public.clip_candidates (
+  id uuid default uuid_generate_v4() primary key,
+  episode_id uuid references public.episodes(id) on delete cascade not null,
+  clip_type text not null check (clip_type in ('Story', 'Contradiction', 'Hot Take', 'Founder Lesson', 'Emotional Moment', 'Key Quote', 'Actionable Advice', 'Big Number', 'Failure', 'Success Story')),
+  start_time numeric not null,
+  end_time numeric not null,
+  transcript_segment text not null,
+  status text default 'pending' check (status in ('pending', 'approved', 'rejected')),
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
+-- 2. viral_moments
+create table if not exists public.viral_moments (
+  id uuid default uuid_generate_v4() primary key,
+  clip_candidate_id uuid references public.clip_candidates(id) on delete cascade not null unique,
+  viral_score numeric check (viral_score >= 0 and viral_score <= 100),
+  hook_strength numeric check (hook_strength >= 0 and hook_strength <= 100),
+  retention_potential numeric check (retention_potential >= 0 and retention_potential <= 100),
+  emotional_impact numeric check (emotional_impact >= 0 and emotional_impact <= 100),
+  curiosity_gap numeric check (curiosity_gap >= 0 and curiosity_gap <= 100),
+  shareability numeric check (shareability >= 0 and shareability <= 100),
+  platform_fit text[] default '{}',
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
+-- 3. short_video_renders
+create table if not exists public.short_video_renders (
+  id uuid default uuid_generate_v4() primary key,
+  clip_candidate_id uuid references public.clip_candidates(id) on delete cascade not null,
+  format text not null check (format in ('9:16', '1:1', '16:9')),
+  platform text not null check (platform in ('tiktok', 'reels', 'youtube_shorts', 'linkedin', 'instagram')),
+  url text,
+  duration numeric,
+  caption_style text default 'dynamic',
+  visual_effects jsonb default '[]'::jsonb,
+  status text default 'processing' check (status in ('processing', 'completed', 'failed')),
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
+-- Enable RLS
+alter table public.clip_candidates enable row level security;
+alter table public.viral_moments enable row level security;
+alter table public.short_video_renders enable row level security;
+
+-- Create minimal policies (can be refined later)
+DROP POLICY IF EXISTS "Users can view their clip candidates" ON public.clip_candidates;
+create policy "Users can view their clip candidates" on public.clip_candidates for all using (exists (select 1 from public.episodes where id = clip_candidates.episode_id and user_id = auth.uid()));
+
+DROP POLICY IF EXISTS "Users can view their viral moments" ON public.viral_moments;
+create policy "Users can view their viral moments" on public.viral_moments for all using (exists (select 1 from public.clip_candidates join public.episodes on clip_candidates.episode_id = episodes.id where clip_candidates.id = viral_moments.clip_candidate_id and episodes.user_id = auth.uid()));
+
+DROP POLICY IF EXISTS "Users can view their short video renders" ON public.short_video_renders;
+create policy "Users can view their short video renders" on public.short_video_renders for all using (exists (select 1 from public.clip_candidates join public.episodes on clip_candidates.episode_id = episodes.id where clip_candidates.id = short_video_renders.clip_candidate_id and episodes.user_id = auth.uid()));
+
+-- Allow shorts to be pushed into publishing OS
+alter table public.publishing_assets drop constraint if exists publishing_assets_asset_type_check;
+alter table public.publishing_assets add constraint publishing_assets_asset_type_check check (asset_type in ('transcript', 'show_notes', 'chapters', 'quotes', 'linkedin', 'x_thread', 'blog', 'newsletter', 'youtube_shorts', 'tiktok', 'reels'));
+
+alter table public.publishing_assets drop constraint if exists publishing_assets_publish_destination_check;
+alter table public.publishing_assets add constraint publishing_assets_publish_destination_check check (publish_destination in ('rss', 'spotify', 'apple', 'youtube', 'linkedin', 'x', 'web', 'email', 'tiktok', 'instagram'));
+
+-- Phase 16: Video Studio Hardening
+
+-- 1. Create video_templates bucket if it doesn't exist
+insert into storage.buckets (id, name, public) 
+values ('video_templates', 'video_templates', true)
+on conflict (id) do nothing;
+
+-- Ensure public access policies are active for video_templates bucket
+DROP POLICY IF EXISTS "Public Access to Video Templates" ON storage.objects;
+create policy "Public Access to Video Templates"
+  on storage.objects for select
+  using ( bucket_id = 'video_templates' );
+
+-- 2. provider_health table
+create table if not exists public.provider_health (
+  id uuid default uuid_generate_v4() primary key,
+  provider_name text not null unique check (provider_name in ('heygen', 'tavus', 'synthesia', 'mock_renderer', 'shorts_renderer')),
+  status text not null default 'operational' check (status in ('operational', 'degraded', 'down', 'maintenance')),
+  success_rate numeric default 100.0,
+  average_render_time_seconds numeric default 0,
+  total_renders integer default 0,
+  failed_renders integer default 0,
+  last_checked timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
+-- Enable RLS
+alter table public.provider_health enable row level security;
+
+-- Provider health should be publicly readable for dashboards
+DROP POLICY IF EXISTS "Provider health is readable by all" ON public.provider_health;
+create policy "Provider health is readable by all" on public.provider_health for select using (true);
+
+-- Seed Providers
+insert into public.provider_health (provider_name, status, success_rate) values
+('heygen', 'operational', 100),
+('tavus', 'maintenance', 0),
+('synthesia', 'operational', 100),
+('mock_renderer', 'operational', 100),
+('shorts_renderer', 'operational', 100)
+on conflict (provider_name) do nothing;
+
+-- Migration 17: Phase 13 Analytics & Growth Engine
+
+-- 1. podcast_analytics
+create table if not exists public.podcast_analytics (
+  id uuid default uuid_generate_v4() primary key,
+  episode_id uuid references public.episodes(id) on delete cascade not null,
+  views integer default 0,
+  downloads integer default 0,
+  completion_rate numeric default 0.0 check (completion_rate >= 0 and completion_rate <= 100),
+  avg_listen_time_seconds numeric default 0,
+  avg_watch_time_seconds numeric default 0,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null,
+  updated_at timestamp with time zone default timezone('utc'::text, now()) not null,
+  unique (episode_id)
+);
+
+-- 2. shorts_analytics
+create table if not exists public.shorts_analytics (
+  id uuid default uuid_generate_v4() primary key,
+  short_render_id uuid references public.short_video_renders(id) on delete cascade not null,
+  platform text not null check (platform in ('tiktok', 'reels', 'youtube_shorts', 'linkedin', 'instagram')),
+  views integer default 0,
+  likes integer default 0,
+  comments integer default 0,
+  shares integer default 0,
+  avg_watch_time numeric default 0,
+  retention_rate numeric default 0 check (retention_rate >= 0 and retention_rate <= 100),
+  ctr numeric default 0 check (ctr >= 0 and ctr <= 100),
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null,
+  updated_at timestamp with time zone default timezone('utc'::text, now()) not null,
+  unique (short_render_id, platform)
+);
+
+-- 3. host_performance
+create table if not exists public.host_performance (
+  id uuid default uuid_generate_v4() primary key,
+  host_id uuid references public.hosts(id) on delete cascade not null,
+  episode_id uuid references public.episodes(id) on delete cascade not null,
+  conversation_flow_score numeric check (conversation_flow_score >= 0 and conversation_flow_score <= 100),
+  naturalness_score numeric check (naturalness_score >= 0 and naturalness_score <= 100),
+  curiosity_score numeric check (curiosity_score >= 0 and curiosity_score <= 100),
+  memory_usage_score numeric check (memory_usage_score >= 0 and memory_usage_score <= 100),
+  average_rating numeric check (average_rating >= 0 and average_rating <= 100),
+  most_successful_topic text,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null,
+  unique (host_id, episode_id)
+);
+
+-- 4. viral_insights
+create table if not exists public.viral_insights (
+  id uuid default uuid_generate_v4() primary key,
+  episode_id uuid references public.episodes(id) on delete cascade not null,
+  common_topics text[] default '{}',
+  common_hooks text[] default '{}',
+  structural_patterns text[] default '{}',
+  emotional_patterns text[] default '{}',
+  recommendations text[] default '{}',
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null,
+  unique (episode_id)
+);
+
+-- 5. content_scorecards
+create table if not exists public.content_scorecards (
+  id uuid default uuid_generate_v4() primary key,
+  episode_id uuid references public.episodes(id) on delete cascade not null,
+  podcast_score numeric check (podcast_score >= 0 and podcast_score <= 100),
+  social_score numeric check (social_score >= 0 and social_score <= 100),
+  growth_score numeric check (growth_score >= 0 and growth_score <= 100),
+  publishing_score numeric check (publishing_score >= 0 and publishing_score <= 100),
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null,
+  unique (episode_id)
+);
+
+-- Enable RLS
+alter table public.podcast_analytics enable row level security;
+alter table public.shorts_analytics enable row level security;
+alter table public.host_performance enable row level security;
+alter table public.viral_insights enable row level security;
+alter table public.content_scorecards enable row level security;
+
+-- Policies for RLS
+DROP POLICY IF EXISTS "Users can read podcast_analytics" ON public.podcast_analytics;
+create policy "Users can read podcast_analytics" on public.podcast_analytics for select using (exists (select 1 from public.episodes where id = podcast_analytics.episode_id and user_id = auth.uid()));
+
+DROP POLICY IF EXISTS "Users can read shorts_analytics" ON public.shorts_analytics;
+create policy "Users can read shorts_analytics" on public.shorts_analytics for select using (exists (
+  select 1 from public.short_video_renders 
+  join public.clip_candidates on short_video_renders.clip_candidate_id = clip_candidates.id 
+  join public.episodes on clip_candidates.episode_id = episodes.id
+  where short_video_renders.id = shorts_analytics.short_render_id and episodes.user_id = auth.uid()
+));
+
+DROP POLICY IF EXISTS "Users can read host_performance" ON public.host_performance;
+create policy "Users can read host_performance" on public.host_performance for select using (exists (select 1 from public.hosts where id = host_performance.host_id and user_id = auth.uid()));
+
+DROP POLICY IF EXISTS "Users can read viral_insights" ON public.viral_insights;
+create policy "Users can read viral_insights" on public.viral_insights for select using (exists (select 1 from public.episodes where id = viral_insights.episode_id and user_id = auth.uid()));
+
+DROP POLICY IF EXISTS "Users can read content_scorecards" ON public.content_scorecards;
+create policy "Users can read content_scorecards" on public.content_scorecards for select using (exists (select 1 from public.episodes where id = content_scorecards.episode_id and user_id = auth.uid()));

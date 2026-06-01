@@ -3,7 +3,7 @@ import { createClient } from '@/utils/supabase/server'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Video, Plus, Calendar, PlayCircle, CheckCircle2, Clock } from 'lucide-react'
+import { Video, Plus, Calendar, PlayCircle, CheckCircle2, Clock, Sparkles, BarChart3 } from 'lucide-react'
 import { deleteEpisode } from './actions'
 import { Badge } from '@/components/ui/badge'
 
@@ -108,11 +108,32 @@ export default async function EpisodesPage() {
                       </Button>
                     </Link>
                   ) : (
-                    <Link href={`/dashboard/episodes/${episode.id}/studio`}>
-                      <Button variant="outline" size="sm" className="border-indigo-200 text-indigo-700 bg-indigo-50 hover:bg-indigo-100 rounded-[10px] shadow-sm font-semibold px-4">
-                        Studio
-                      </Button>
-                    </Link>
+                    <>
+                      <Link href={`/dashboard/episodes/${episode.id}/studio`}>
+                        <Button variant="outline" size="sm" className="border-indigo-200 text-indigo-700 bg-indigo-50 hover:bg-indigo-100 rounded-[10px] shadow-sm font-semibold px-4">
+                          Studio
+                        </Button>
+                      </Link>
+                      <Link href={`/dashboard/episodes/${episode.id}/video-studio`}>
+                        <Button variant="outline" size="sm" className="border-purple-200 text-purple-700 bg-purple-50 hover:bg-purple-100 rounded-[10px] shadow-sm font-semibold px-4">
+                          <Video className="w-4 h-4 mr-1.5" /> Video
+                        </Button>
+                      </Link>
+                      {episode.status === 'Completed' && (
+                        <>
+                          <Link href={`/dashboard/episodes/${episode.id}/shorts`}>
+                            <Button variant="outline" size="sm" className="border-orange-200 text-orange-700 bg-orange-50 hover:bg-orange-100 rounded-[10px] shadow-sm font-semibold px-4">
+                              <Sparkles className="w-4 h-4 mr-1.5" /> Shorts
+                            </Button>
+                          </Link>
+                          <Link href={`/dashboard/episodes/${episode.id}/analytics`}>
+                            <Button variant="outline" size="sm" className="border-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-[10px] shadow-sm font-semibold px-4">
+                              <BarChart3 className="w-4 h-4 mr-1.5" /> Analytics
+                            </Button>
+                          </Link>
+                        </>
+                      )}
+                    </>
                   )}
                   <form action={async () => {
                     'use server'

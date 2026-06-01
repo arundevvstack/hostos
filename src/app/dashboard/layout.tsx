@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { logout } from '@/app/auth/actions'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { Mic, Users, Settings, Database, Video, LayoutDashboard, Share2, Activity } from 'lucide-react'
+import { Mic, Users, Settings, Database, Video, LayoutDashboard, Share2, Activity, BarChart3 } from 'lucide-react'
 
 export default async function DashboardLayout({
   children,
@@ -31,11 +31,13 @@ export default async function DashboardLayout({
   const links = [
     { href: '/dashboard', label: 'Dashboard', icon: <LayoutDashboard className="h-5 w-5" /> },
     { href: '/dashboard/observability', label: 'Launch Console', icon: <Activity className="h-5 w-5" /> },
+    { href: '/dashboard/analytics', label: 'Growth Analytics', icon: <BarChart3 className="h-5 w-5" /> },
     { href: '/dashboard/hosts', label: 'AI Hosts', icon: <Mic className="h-5 w-5" /> },
     { href: '/dashboard/episodes', label: 'Episodes', icon: <Video className="h-5 w-5" /> },
     { href: '/dashboard/publishing', label: 'Publishing OS', icon: <Share2 className="h-5 w-5" /> },
     { href: '/dashboard/guests', label: 'Guests', icon: <Users className="h-5 w-5" /> },
     { href: '/dashboard/knowledge', label: 'Knowledge Base', icon: <Database className="h-5 w-5" /> },
+    { href: '/dashboard/video/health', label: 'Provider Health', icon: <Activity className="h-5 w-5" /> },
     { href: '/dashboard/settings', label: 'Settings', icon: <Settings className="h-5 w-5" /> },
   ]
 

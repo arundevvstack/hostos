@@ -1,4 +1,4 @@
-import { VoiceOptions, VoiceProvider } from './provider'
+import { VoiceOptions, VoiceProvider, BrowserSpeechProvider } from './provider'
 
 export class ElevenLabsProvider implements VoiceProvider {
   private currentAudio: HTMLAudioElement | null = null
@@ -9,8 +9,10 @@ export class ElevenLabsProvider implements VoiceProvider {
 
       const apiKey = process.env.NEXT_PUBLIC_ELEVENLABS_API_KEY
       if (!apiKey) {
-        console.error('ElevenLabs API key is missing')
-        return reject(new Error('ElevenLabs API key is missing'))
+        console.warn('ElevenLabs API key is missing. Falling back to browser speech.')
+        const fallback = new BrowserSpeechProvider()
+        await fallback.speak(text, options)
+        return resolve()
       }
 
       // Default to Rachel if no voice is provided
@@ -37,7 +39,10 @@ export class ElevenLabsProvider implements VoiceProvider {
         })
 
         if (!response.ok) {
-          throw new Error(`ElevenLabs API error: ${response.status}`)
+          console.warn(`ElevenLabs API failed (${response.status}). Falling back to browser speech.`)
+          const fallback = new BrowserSpeechProvider()
+          await fallback.speak(text, options)
+          return resolve()
         }
 
         const blob = await response.blob()

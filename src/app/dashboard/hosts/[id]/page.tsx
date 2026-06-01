@@ -1,5 +1,6 @@
 import { updateHost } from '../actions'
 import { VoiceSettings } from '@/components/hosts/voice-settings'
+import { AvatarSettings } from '@/components/hosts/avatar-settings'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -32,6 +33,13 @@ export default async function EditHostPage(props: { params: Promise<{ id: string
   if (!host) {
     redirect('/dashboard/hosts')
   }
+
+  const { data: avatarProfile } = await supabase
+    .from('avatar_profiles')
+    .select('*')
+    .eq('entity_type', 'host')
+    .eq('entity_id', host.id)
+    .maybeSingle()
 
   return (
     <div className="max-w-[1000px] mx-auto space-y-10 p-6">
@@ -164,6 +172,18 @@ export default async function EditHostPage(props: { params: Promise<{ id: string
                   initialRate={(host.voice_rate || 0.9).toString()}
                   initialPitch={(host.voice_pitch || 1.0).toString()}
                   initialVolume={(host.voice_volume || 1.0).toString()}
+                />
+              </div>
+            </div>
+
+            {/* SECTION: Video Avatar */}
+            <div>
+              <h3 className="text-[20px] font-bold text-foreground font-heading border-b border-border pb-3 mb-6 mt-10">5. Video Avatar (Optional)</h3>
+              <div className="bg-card border border-border shadow-sm rounded-[24px] p-7">
+                <AvatarSettings 
+                  initialProvider={avatarProfile?.provider || 'heygen'}
+                  initialAvatarId={avatarProfile?.provider_avatar_id || ''}
+                  initialGestureStyle={avatarProfile?.gesture_style || 'neutral'}
                 />
               </div>
             </div>

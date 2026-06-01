@@ -248,6 +248,9 @@ export default function EpisodePublishingPage() {
   }
 
   const assetList = [
+    { type: 'youtube_shorts', label: 'YouTube Shorts', destination: 'youtube' },
+    { type: 'tiktok', label: 'TikTok Video', destination: 'tiktok' },
+    { type: 'reels', label: 'Instagram Reel', destination: 'instagram' },
     { type: 'show_notes', label: 'Show Notes', destination: 'rss' },
     { type: 'transcript', label: 'Transcript', destination: 'rss' },
     { type: 'chapters', label: 'Chapters', destination: 'rss' },

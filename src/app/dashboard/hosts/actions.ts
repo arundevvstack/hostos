@@ -50,6 +50,20 @@ export async function createHost(formData: FormData) {
     throw new Error('Failed to create host')
   }
 
+  const avatarProvider = formData.get('avatar_provider') as string || 'none'
+  const avatarId = formData.get('avatar_id') as string || ''
+  const avatarGestureStyle = formData.get('avatar_gesture_style') as string || 'neutral'
+
+  if (avatarProvider !== 'none') {
+    await supabase.from('avatar_profiles').insert({
+      entity_type: 'host',
+      entity_id: data.id,
+      provider: avatarProvider,
+      provider_avatar_id: avatarId,
+      gesture_style: avatarGestureStyle,
+    })
+  }
+
   revalidatePath('/dashboard/hosts')
   redirect('/dashboard/hosts')
 }
@@ -116,6 +130,33 @@ export async function updateHost(formData: FormData) {
   if (error) {
     console.error('Error updating host:', error)
     throw new Error('Failed to update host')
+  }
+
+  const avatarProvider = formData.get('avatar_provider') as string || 'none'
+  const avatarId = formData.get('avatar_id') as string || ''
+  const avatarGestureStyle = formData.get('avatar_gesture_style') as string || 'neutral'
+
+  if (avatarProvider !== 'none') {
+    const { data: existingAvatar } = await supabase.from('avatar_profiles').select('id').eq('entity_type', 'host').eq('entity_id', id).maybeSingle()
+    if (existingAvatar) {
+      await supabase.from('avatar_profiles').update({
+        provider: avatarProvider,
+        provider_avatar_id: avatarId,
+        gesture_style: avatarGestureStyle,
+        updated_at: new Date().toISOString(),
+      }).eq('id', existingAvatar.id)
+    } else {
+      await supabase.from('avatar_profiles').insert({
+        entity_type: 'host',
+        entity_id: id,
+        provider: avatarProvider,
+        provider_avatar_id: avatarId,
+        gesture_style: avatarGestureStyle,
+      })
+    }
+  } else {
+    // If set to 'none', delete the existing avatar profile if it exists
+    await supabase.from('avatar_profiles').delete().eq('entity_type', 'host').eq('entity_id', id)
   }
 
   revalidatePath('/dashboard/hosts')
