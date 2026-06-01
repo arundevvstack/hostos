@@ -3,14 +3,12 @@ import { generateObject, streamText, Message } from 'ai'
 import { z } from 'zod'
 import { createClient } from '@/utils/supabase/server'
 
-export const maxDuration = 60 // Allow longer execution for intelligence pipeline
+export const maxDuration = 60
 
 export async function POST(req: Request) {
   const { messages, episodeId, hostId, currentPhase } = await req.json()
-
   const supabase = createClient()
   
-  // 1. Save the incoming guest message
   const lastUserMessage = messages[messages.length - 1]
   const { data: userMsgData } = await supabase.from('conversations').insert({
     episode_id: episodeId,
@@ -20,22 +18,14 @@ export async function POST(req: Request) {
 
   const guestMessageId = userMsgData?.id
 
-  // 2. Fetch required context for the Intelligence Layer
-  const { data: episode } = await supabase
-    .from('episodes')
-    .select('*, hosts(*), guests(*)')
-    .eq('id', episodeId)
-    .single()
-
+  const { data: episode } = await supabase.from('episodes').select('*, hosts(*), guests(*)').eq('id', episodeId).single()
   const { data: hostDna } = await supabase.from('host_dna').eq('host_id', hostId).single()
   const { data: phases } = await supabase.from('interview_phases').select('*')
-  
   const activePhaseInfo = phases?.find(p => p.name === currentPhase)
 
   // ==========================================
   // CALL 1: STRUCTURED EVALUATION LAYER
   // ==========================================
-  
   const evaluationSchema = z.object({
     sentiment: z.enum(['positive', 'neutral', 'negative', 'mixed']),
     confidence: z.number().min(0).max(100),
@@ -59,20 +49,17 @@ export async function POST(req: Request) {
     phase_reasoning: z.string(),
   })
 
-  // Evaluate the conversation up to this point
   const conversationHistory = messages.map((m: Message) => `${m.role}: ${m.content}`).join('\n')
 
   const { object: evaluation } = await generateObject({
     model: google('gemini-1.5-pro'),
     schema: evaluationSchema,
     system: `You are the AI Evaluation Layer for a podcast interview. 
-Analyze the guest's latest message in the context of the conversation.
 Current Phase: ${currentPhase} (Goal: ${activePhaseInfo?.goal})
-Criteria to progress phase: ${activePhaseInfo?.completion_criteria}`,
+Criteria to progress: ${activePhaseInfo?.completion_criteria}`,
     prompt: `Guest just said: "${lastUserMessage.content}"\n\nFull History:\n${conversationHistory}`,
   })
 
-  // Persistence Step: Fan out evaluation data
   if (guestMessageId) {
     await supabase.from('conversation_metrics').insert({
       message_id: guestMessageId,
@@ -94,24 +81,6 @@ Criteria to progress phase: ${activePhaseInfo?.completion_criteria}`,
     })
   }
 
-  for (const contradiction of evaluation.contradictions) {
-    await supabase.from('contradictions').insert({
-      episode_id: episodeId,
-      contradiction_a: contradiction.contradiction_a,
-      contradiction_b: contradiction.contradiction_b,
-      severity: contradiction.severity
-    })
-  }
-
-  for (const target of evaluation.curiosity_targets) {
-    await supabase.from('curiosity_targets').insert({
-      episode_id: episodeId,
-      trigger_statement: target.trigger_statement,
-      curiosity_score: evaluation.curiosity_score,
-      suggested_followups: target.suggested_followups
-    })
-  }
-
   // Update phase if changed
   let activePhase = currentPhase
   if (evaluation.next_phase && evaluation.next_phase !== currentPhase) {
@@ -122,54 +91,56 @@ Criteria to progress phase: ${activePhaseInfo?.completion_criteria}`,
   // ==========================================
   // CALL 2: STREAMING GENERATION
   // ==========================================
-
-  // Fetch updated memory context for the prompt
-  const { data: latestMemories } = await supabase.from('conversation_memory').select('*').eq('episode_id', episodeId).limit(10)
+  const { data: latestMemories } = await supabase.from('conversation_memory').select('*').eq('episode_id', episodeId).limit(15)
 
   const systemPrompt = `You are ${episode?.hosts?.name}, a professional podcast host.
-Your Personality: ${episode?.hosts?.personality_traits?.join(', ') || 'Professional'}
-Your Expertise: ${episode?.hosts?.expertise_areas?.join(', ') || 'General'}
-Your Interview Style: ${episode?.hosts?.interview_style || 'Conversational'}
-Your Tone: ${episode?.hosts?.tone_of_voice || 'Warm'}
+Your Personality: ${episode?.hosts?.personality_traits?.join(', ')}
+Your Expertise: ${episode?.hosts?.expertise_areas?.join(', ')}
+Your Tone: ${episode?.hosts?.tone_of_voice}
 
 Host DNA Sliders (0-100):
 - Curiosity: ${hostDna?.curiosity_level || 50}
 - Challenge: ${hostDna?.challenge_level || 50}
 - Empathy: ${hostDna?.empathy_level || 50}
-- Humor: ${hostDna?.humor_level || 50}
 - Storytelling: ${hostDna?.storytelling_level || 50}
-- Follow-up Depth: ${hostDna?.followup_depth || 50}
 
 Current Interview Phase: ${activePhase}
+Selected Strategy: ${evaluation.response_strategy}
 
-Guest Context:
-Name: ${episode?.guests?.name}
-Bio: ${episode?.guests?.bio}
+Guest Context: ${episode?.guests?.name}, ${episode?.guests?.bio}
 
-Dynamic Memory Feed:
-${latestMemories?.map(m => `- [${m.memory_type.toUpperCase()}] ${m.memory_content}`).join('\n')}
-
-Selected Strategy for this response: ${evaluation.response_strategy}
-Reasoning: ${evaluation.phase_reasoning}
+Dynamic Memory Feed (Facts previously extracted):
+${latestMemories?.map(m => `[ID: ${m.id}] - ${m.memory_content}`).join('\n')}
 
 INSTRUCTIONS:
-1. Generate the next response to the guest.
-2. Adapt your tone strictly to your Host DNA and Personality.
-3. Execute the selected strategy (${evaluation.response_strategy}).
-4. If there is a memory relevant, reference it naturally.
-5. DO NOT act like an AI. Act exactly like the human podcast host described.
-6. Keep your responses concise and conversational.`
+1. Generate the next response. Execute strategy: ${evaluation.response_strategy}.
+2. If you reference a fact from the Dynamic Memory Feed, you MUST append a memory tag at the VERY END of your response formatted exactly like this: <REFS: id1, id2>. E.g., "That is interesting. <REFS: a1b2c3d4-..., f5e6d7c8-...>". 
+3. Do not act like an AI. Keep responses conversational and human-like.`
 
   const result = await streamText({
     model: google('gemini-1.5-pro'),
     system: systemPrompt,
     messages,
     onFinish: async ({ text }) => {
-      // Persist the host's generated response
+      // Extract memory references via regex
+      const refRegex = /<REFS:\s*([^>]+)>/;
+      const match = text.match(refRegex);
+      
+      let referencedIds: string[] = [];
+      let cleanedText = text;
+
+      if (match) {
+        referencedIds = match[1].split(',').map(id => id.trim());
+        cleanedText = text.replace(refRegex, '').trim();
+      }
+
       await supabase.from('conversations').insert({
         episode_id: episodeId,
         role: 'host',
-        message: text,
+        message: cleanedText,
+        referenced_memory_ids: referencedIds,
+        response_strategy: evaluation.response_strategy,
+        interview_phase: activePhase
       })
     }
   })
