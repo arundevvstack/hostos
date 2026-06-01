@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Send, User, Mic, Brain, Lightbulb, AlertTriangle, MessageSquare } from 'lucide-react'
-import { useChat } from 'ai/react'
+import { useChat } from '@ai-sdk/react'
 
 type InterviewRoomProps = {
   episode: any
