@@ -10,6 +10,11 @@ export default async function DashboardPage() {
     data: { user },
   } = await supabase.auth.getUser()
 
+  if (!user) {
+    // Layout will also redirect, but we must prevent TypeError here
+    return null;
+  }
+
   // Fetch counts
   const [{ count: hostCount }, { count: episodeCount }, { count: guestCount }] = await Promise.all([
     supabase.from('hosts').select('*', { count: 'exact', head: true }).eq('user_id', user!.id),
